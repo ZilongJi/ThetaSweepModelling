@@ -33,7 +33,7 @@ def plot_population_activity(ax, time_steps, theta_phase, net_activity, directio
     # set the jump points to NaN for plotting
     direction_plot = direction.copy()
     direction_plot[jumps + 1] = np.nan    
-    ax.plot(time_steps, direction_plot, color="#F18D00", lw=2)
+    ax.plot(time_steps, direction_plot, color="white", lw=3)
     
     if add_lines:
         zero_phase_index = np.where(np.isclose(theta_phase, 0, atol=atol))[0]
@@ -97,4 +97,5 @@ def plot_phase_coding(ax, cell_activity, direction, theta_phase, cell_index=None
     ax.tick_params(axis='both', which='major', labelsize=10)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
+    ax.set_title('Single-cell theta phase coding', fontsize=14)
     return ax
