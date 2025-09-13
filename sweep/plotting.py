@@ -18,14 +18,16 @@ def plot_theta_modulation(ax, time_steps, theta_phase, theta_modulation, add_lin
 
     return ax
 
-def plot_population_activity(ax, time_steps, theta_phase, net_activity, direction, add_lines=True, atol=1e-2):
+def plot_population_activity(ax, time_steps, theta_phase, net_activity, direction, add_lines=True, atol=1e-2, **kwargs):
     """Plot HD network population activity + direction trace."""
+    cmap = kwargs.pop("cmap", "jet")  # 取出 cmap，如果没传就用 jet
     im = ax.imshow(
         net_activity.T * 100,
         aspect="auto",
         extent=[time_steps[0], time_steps[-1], -np.pi, np.pi],
-        cmap="jet",
         origin="lower",
+        cmap=cmap,
+        **kwargs
     )
     
     # find the jump points where the difference between two adjacent points is greater than pi

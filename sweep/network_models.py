@@ -15,6 +15,7 @@ class DCParams:
     a: float = 0.7
     A: float = 3.0
     J0: float = 1.0
+    g: float = 1.0
     z_min: float = -bm.pi
     z_max: float = bm.pi
     conn_noise: float = 0.0
@@ -115,15 +116,16 @@ class DCNet(bp.DynamicalSystem):
         self.u.value = bm.where(u > 0, u, 0)
         self.v.value = v
 
-        r1 = bm.square(self.u)
-        self.r.value = r1 / (1.0 + self.params.k * bm.sum(r1))
+        u_sq = bm.square(self.u)
+        self.r.value = self.params.g * u_sq / (1.0 + self.params.k * bm.sum(u_sq))
 
 @dataclass
 class GCParams:
     # dynamics
     tau: float = 10.0
     tau_v: float = 100.0
-    noise_strength: float = 0.1
+    noise_strength: float = 0.1 #activity noise
+    conn_noise: float = 0.0 #connectivity noise
     k: float = 1.0
     adaptation_strength: float = 15.0  # (mbar)
     
@@ -131,17 +133,13 @@ class GCParams:
     a: float = 0.8
     A: float = 3.0
     J0: float = 5.0
-    g: float = 1000.0
+    g: float = 1000.0 #scale the firing rate to make it reasonable, no biological meaning
 
-    # lattice / geometry
-    ratio: float = 1.0                # Lambda = 2*pi/ratio
-    x_min: float = -bm.pi
-    x_max: float = bm.pi
-    grid_type: str = "Rectangle"      # "Rectangle" or "Hexagonal"
-    phase_offset: float = 1.0 / 9.0   # offset input from conjunctive gc layer to gc layer, this is the key to drive the bump to move
-
-    # noise on connectivity
-    conn_noise: float = 0.0
+    #controlling grid spacing, larger means smaller spacing
+    mapping_ratio: float = 1  
+    
+    #cntrolling offset length from conjunctive gc layer to gc layer, this is the key to drive the bump to move
+    phase_offset: float = 1.0 / 20  #relative to -pi~pi range
     
 class GCNet(bp.DynamicalSystem):
     """
@@ -159,33 +157,27 @@ class GCNet(bp.DynamicalSystem):
         # ----- derived parameters -----
         self.num = num_gc_x * num_gc_x
         self.m = params.adaptation_strength * params.tau / params.tau_v
-        self.Lambda = 2 * bm.pi / params.ratio  # grid period from ratio
+        self.Lambda = 2 * bm.pi / params.mapping_ratio #grid spacing
 
         # ----- coordinate transforms (hex vs rect) -----
+        # Note that coor_transform is to map a parallelogram with a 60-degree angle back to a square
+        # The logic is to partition the 2D space into parallelograms, each of which contains one lattice of grid cells, and repeat the parallelogram to tile the whole space
         self.coor_transform = bm.array([[1.0, -1.0 / bm.sqrt(3.0)],
                                         [0.0,  2.0 / bm.sqrt(3.0)]])
-        # inverse
+          
+        # inverse, which is bm.array([[1.0, 1.0 / 2],[0.0,  bm.sqrt(3.0) / 2]])   
+        # Note that coor_transform_inv is to map a square to a parallelogram with a 60-degree angle
         self.coor_transform_inv = np.linalg.inv(np.array(self.coor_transform))
 
         # ----- feature space -----
-        self.x_min, self.x_max = params.x_min, params.x_max
-        self.x_range = self.x_max - self.x_min
-
-        x1 = bm.linspace(self.x_min, self.x_max, num_gc_x + 1)
-        axis = x1[:-1]
-        self.x = axis
-        self.y = axis
-
-        x_grid, y_grid = bm.meshgrid(self.x, self.y)
+        x_bins = bm.linspace(-bm.pi, bm.pi, num_gc_x + 1)
+        x_grid, y_grid = bm.meshgrid(x_bins[:-1], x_bins[:-1])
         self.x_grid = x_grid.reshape(-1)
         self.y_grid = y_grid.reshape(-1)
 
         # positions in (x,y) space and transformed space
-        self.value_grid = bm.stack([self.x_grid, self.y_grid], axis=1)              # (N, 2)
-
-        # ‘bump’ helper (same shape as value_grid, just scaled)
-        self.value_bump = self.value_grid * 4.0
-
+        self.value_grid = bm.stack([self.x_grid, self.y_grid], axis=1)    # (N, 2)
+        self.value_bump = self.value_grid * 4
         # ----- candidate centers (for center snapping) -----
         self.candidate_centers = self.make_candidate_centers(self.Lambda)
 
@@ -260,16 +252,16 @@ class GCNet(bp.DynamicalSystem):
         """
         map position->phase; phase is wrapped to [-pi, pi] per-axis
         """
-        loc = position * self.params.ratio
-        phase = bm.matmul(self.coor_transform, loc) + bm.pi
+        mapped_pos = position * self.params.mapping_ratio
+        phase = bm.matmul(self.coor_transform, mapped_pos) + bm.pi
         px = bm.mod(phase[0], 2.0 * bm.pi) - bm.pi
         py = bm.mod(phase[1], 2.0 * bm.pi) - bm.pi
         return bm.array([px, py])
 
-    def calculate_input_from_conjgc(self, animal_pos, direction_activity, theta_modulation, head_direction):
+    def calculate_input_from_conjgc(self, animal_pos, direction_activity, theta_modulation):
         """Get input from conjunctive grid cell layer → grid cell layer; returns (N,) vector."""
         assert bm.size(animal_pos) == 2
-        num_dc = self.params.num_dc
+        num_dc = self.num_dc
         num_gc = self.num
         direction_bin = bm.linspace(-bm.pi, bm.pi, num_dc)
 
@@ -318,7 +310,7 @@ class GCNet(bp.DynamicalSystem):
         center_phase = center_phase.at[1].set(bm.angle(bm.sum(exppos_y * activity_masked)))
 
         # --- map back to real space, snap to nearest candidate ---
-        center_pos_residual = bm.matmul(self.coor_transform_inv, center_phase) / self.params.ratio
+        center_pos_residual = bm.matmul(self.coor_transform_inv, center_phase) / self.params.mapping_ratio
         candidate_pos_all = self.candidate_centers + center_pos_residual
         distances = bm.linalg.norm(candidate_pos_all - animal_posistion, axis=1)
         center_position = candidate_pos_all[bm.argmin(distances)]
@@ -331,7 +323,7 @@ class GCNet(bp.DynamicalSystem):
         return center_phase, center_position, gc_bump
 
     # one-step update (main)
-    def update(self, animal_posistion, direction_activity, theta_modulation, head_direction):
+    def update(self, animal_posistion, direction_activity, theta_modulation):
         
         # get bump activity in real space info from network activity on the manifold ---
         center_phase, center_position, gc_bump = self.get_unique_activity_bump(self.r, animal_posistion)
@@ -342,13 +334,13 @@ class GCNet(bp.DynamicalSystem):
         # get external input to grid cell layer from conjunctive grid cell layer
         # note that this conjunctive input will be theta modulated. When speed is high, theta modulation is high, thus input is stronger
         # This is how we get longer theta sweeps when speed is high
-        conj_input = self.calculate_input_from_conjgc(animal_posistion, direction_activity, theta_modulation, head_direction)
+        conj_input = self.calculate_input_from_conjgc(animal_posistion, direction_activity, theta_modulation)
         self.conj_input.value = conj_input
 
         # recurrent + noise
         Irec = bm.matmul(self.conn_mat, self.r)
-        noise = bm.random.randn(self.num) * self.params.noise_strength
-        total_net_input = Irec + conj_input + noise
+        input_noise = bm.random.randn(self.num) * self.params.noise_strength
+        total_net_input = Irec + conj_input + input_noise
 
         # integrate
         u, v = self.integral(self.u, self.v, bp.share.load("t"), total_net_input)
@@ -358,7 +350,6 @@ class GCNet(bp.DynamicalSystem):
         # get neuron firing by global inhibition
         u_sq = bm.square(self.u)
         self.r.value = self.params.g * u_sq / (1.0 + self.params.k * bm.sum(u_sq))
-
 
 
 def traj(x0, v, T):
