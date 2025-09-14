@@ -220,7 +220,7 @@ class GCNet(bp.DynamicalSystem):
         #consider the periodic boundary condition
         d = self.handle_periodic_condition(d)
         # transform to lattice axes
-        dist = (bm.matmul(self.coor_transform_inv, d.T)).T  # (..., 2)
+        dist = (bm.matmul(self.coor_transform_inv, d.T)).T  #This means the bump on the parallelogram lattice is a Gaussian, while in the square space it is a twisted Gaussian
         return bm.sqrt(dist[:, 0] ** 2 + dist[:, 1] ** 2)
 
     def make_candidate_centers(self, Lambda):
@@ -231,8 +231,10 @@ class GCNet(bp.DynamicalSystem):
             for j in range(N_c):
                 cc = cc.at[i, j, 0].set((-N_c // 2 + i) * Lambda)
                 cc = cc.at[i, j, 1].set((-N_c // 2 + j) * Lambda)
-                
-        return cc.reshape(N_c * N_c, 2)
+        
+        cc_tranformed = bm.dot(self.coor_transform_inv, cc.reshape(N_c * N_c, 2).T).T
+        
+        return cc_tranformed
 
     # ========================= Connectivity =========================
     def make_connection(self):
