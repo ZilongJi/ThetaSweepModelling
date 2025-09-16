@@ -7,6 +7,12 @@ This repository contains code and resources for simulating and analyzing theta s
 
 ### Details of use
 
+TBD 
+
+(Examples are under the "notebooks" folder)
+
+### Requirements
+
 TBD
 
 ### The models are based on the following publications:
