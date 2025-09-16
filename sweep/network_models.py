@@ -147,11 +147,12 @@ class GCNet(bp.DynamicalSystem):
     Grid size is num_gc_x x num_gc_x (total cells = num_gc_1side**2).
     """
 
-    def __init__(self, num_dc: int = 100, num_gc_x: int = 100, params: GCParams = GCParams()):
+    def __init__(self, num_dc: int = 100, num_gc_x: int = 100, envsize=1, params: GCParams = GCParams()):
         super().__init__()
         
         self.num_dc = num_dc       
         self.num_gc_1side = num_gc_x
+        self.envsize = envsize
         self.params = params
 
         # ----- derived parameters -----
@@ -224,7 +225,8 @@ class GCNet(bp.DynamicalSystem):
         return bm.sqrt(dist[:, 0] ** 2 + dist[:, 1] ** 2)
 
     def make_candidate_centers(self, Lambda):
-        N_c = 32
+        #This will generate a massivly large number of candidate centers, so that cover the simulated environmental size sufficiently
+        N_c = bm.int(bm.ceil(self.envsize/Lambda)+1) * 2  #number of candidates along one dimension
         cc = bm.zeros((N_c, N_c, 2))
  
         for i in range(N_c):
@@ -312,8 +314,8 @@ class GCNet(bp.DynamicalSystem):
         center_phase = center_phase.at[1].set(bm.angle(bm.sum(exppos_y * activity_masked)))
 
         # --- map back to real space, snap to nearest candidate ---
-        center_pos_residual = bm.matmul(self.coor_transform_inv, center_phase) / self.params.mapping_ratio
-        candidate_pos_all = self.candidate_centers + center_pos_residual
+        center_phase_residual = bm.matmul(self.coor_transform_inv, center_phase) / self.params.mapping_ratio
+        candidate_pos_all = self.candidate_centers + center_phase_residual
         distances = bm.linalg.norm(candidate_pos_all - animal_posistion, axis=1)
         center_position = candidate_pos_all[bm.argmin(distances)]
 
@@ -352,57 +354,3 @@ class GCNet(bp.DynamicalSystem):
         # get neuron firing by global inhibition
         u_sq = bm.square(self.u)
         self.r.value = self.params.g * u_sq / (1.0 + self.params.k * bm.sum(u_sq))
-
-
-def traj(x0, v, T):
-    x = []
-    xt = x0
-    for i in range(T):
-        xt = xt + v * bm.dt
-        if xt > np.pi:
-            xt -= 2 * np.pi
-        if xt < -np.pi:
-            xt += 2 * np.pi
-        x.append(xt)
-    return np.array(x)
-
-def calculate_inst_speed(directions, samples_per_sec):
-    diff_dist = np.diff(directions.flatten())
-    # consider the periodic boundary condition that is, if diff > pi, then diff = diff - 2*pi
-    # if diff < -pi, then diff = diff + 2*pi
-    diff_dist = np.where(diff_dist > np.pi, diff_dist - 2 * np.pi, diff_dist)
-    diff_dist = np.where(diff_dist < -np.pi, diff_dist + 2 * np.pi, diff_dist)
-    inst_speed = diff_dist * samples_per_sec
-    # insert the first element the same as the second element
-    inst_speed = np.insert(inst_speed, 0, 0)
-    return inst_speed
-
-
-def traj(x0, v, T):
-    x = []
-    xt = x0
-    for i in range(T):
-        xt = xt + v * bm.dt
-        if xt > np.pi:
-            xt -= 2 * np.pi
-        if xt < -np.pi:
-            xt += 2 * np.pi
-        x.append(xt)
-    return np.array(x)
-
-
-
-def straight_line(x0, v, angle, T):
-    x = []
-    y = []
-    xt = x0
-    yt = x0
-    for i in range(T):
-        # xt = xt + v * bm.cos(angle) * bm.dt
-        # yt = yt + v * bm.sin(angle) * bm.dt
-        xt = xt + v * np.cos(angle) 
-        yt = yt + v * np.sin(angle) 
-        x.append(xt)
-        y.append(yt)
-    Animal_location = np.array([x, y])
-    return Animal_location
