@@ -3,6 +3,8 @@ Computational models for theta sweeps and theta phase precession in spatial tuni
 
 This repository contains code and resources for simulating and analyzing theta sweeps and theta phase precession in spatial tuning cells, such as head direction cell, place cells and grid cells. 
 
+![Grid cell sweeps](./figures/gridcell_sweeps.gif)
+
 ### Details of use
 
 TBD
