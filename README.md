@@ -8,11 +8,15 @@ This repository contains code and resources for simulating and analyzing theta s
 
 ### Installation
 
+The package is not yet published to PyPI, so install it from source after cloning the repository:
+
 ```bash
-pip install -e ".[dev]"
+pip install -e .
 # or
-uv pip install ".[dev]"
+uv pip install -e .
 ```
+
+Add the `".[dev]"` extra if you also want the local testing and linting tools (`pytest`, `ruff`).
 
 ### Details of use
 
@@ -37,7 +41,6 @@ Zilong Ji\*, Eleonora Lomi\*, Kate Jeffery, Anna S. Mitchell, and Neil Burgess. 
 ### Left-right theta sweeps in grid cells:
 
 Zilong Ji\*, Tianhao Chu\*, Si Wu\#, and Neil Burgess\#. "A systems model of alternating theta sweeps via firing rate adaptation." Current Biology 35, no. 4 (2025): 709-722.
-
 
 
 
