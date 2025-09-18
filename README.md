@@ -1,9 +1,18 @@
 # ThetaSweepModelling
+
 Computational models for theta sweeps and theta phase precession in spatial tuning cells.
 
-This repository contains code and resources for simulating and analyzing theta sweeps and theta phase precession in spatial tuning cells, such as head direction cell, place cells and grid cells. 
+This repository contains code and resources for simulating and analyzing theta sweeps and theta phase precession in spatial tuning cells, such as head direction cells, place cells, and grid cells.
 
 ![Grid cell sweeps](./figures/gridcell_sweeps.gif)
+
+### Installation
+
+```bash
+pip install -e ".[dev]"
+# or
+uv pip install ".[dev]"
+```
 
 ### Details of use
 
