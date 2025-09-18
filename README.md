@@ -1,9 +1,22 @@
 # ThetaSweepModelling
+
 Computational models for theta sweeps and theta phase precession in spatial tuning cells.
 
-This repository contains code and resources for simulating and analyzing theta sweeps and theta phase precession in spatial tuning cells, such as head direction cell, place cells and grid cells. 
+This repository contains code and resources for simulating and analyzing theta sweeps and theta phase precession in spatial tuning cells, such as head direction cells, place cells, and grid cells.
 
 ![Grid cell sweeps](./figures/gridcell_sweeps.gif)
+
+### Installation
+
+The package is not yet published to PyPI, so install it from source after cloning the repository:
+
+```bash
+pip install -e .
+# or
+uv pip install -e .
+```
+
+Add the `".[dev]"` extra if you also want the local testing and linting tools (`pytest`, `ruff`).
 
 ### Details of use
 
@@ -28,7 +41,6 @@ Zilong Ji\*, Eleonora Lomi\*, Kate Jeffery, Anna S. Mitchell, and Neil Burgess. 
 ### Left-right theta sweeps in grid cells:
 
 Zilong Ji\*, Tianhao Chu\*, Si Wu\#, and Neil Burgess\#. "A systems model of alternating theta sweeps via firing rate adaptation." Current Biology 35, no. 4 (2025): 709-722.
-
 
 
 

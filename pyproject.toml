@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "theta-sweep-modelling"
+version = "0.1.0"
+description = "Computational models for theta sweeps and theta phase precession in spatial tuning cells."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Zilong Ji", email = "zilong.ji@ucl.ac.uk" },
+    { name = "Tianhao Chu", email = "chutianhao@stu.pku.edu.cn" },
+    { name = "Sichao He", email = "sichaohe@outlook.com" },
+]
+keywords = ["neuroscience", "simulation", "theta-sweep", "brainpy"]
+requires-python = ">=3.10"
+dependencies = [
+    "brainpy==2.6.1",
+    "jax==0.4.38",
+    "numpy==2.2.6",
+    "matplotlib>=3.7",
+    "seaborn>=0.12",
+    "ratinabox==1.15.3",
+    "ipython>=8.37.0",
+    "notebook>=7.4.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.6",
+]
+
+[project.urls]
+Repository = "https://github.com/ZilongJi/ThetaSweepModelling"
+Issues = "https://github.com/ZilongJi/ThetaSweepModelling/issues"
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+include = ["theta_sweep", "theta_sweep.*"]
