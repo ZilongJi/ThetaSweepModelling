@@ -3,6 +3,111 @@ import brainpy as bp
 import brainpy.math as bm
 import jax
 import numpy as np
+import networkx as nx
+
+@dataclass
+class PCParams:
+    tau: float = 10.0
+    tau_v: float = 100.0
+    noise_strength: float = 0.0
+    k: float = 0.2
+    adaptation_strength: float = 15.0
+    a: float = 0.7
+    A: float = 5.0
+    J0: float = 1.0
+    g: float = 1.0
+    conn_noise: float = 0.0
+
+class PCNet(bp.DynamicalSystem):
+    """
+    Graph-based continuous-attractor place cell network.
+    Each node in G corresponds to a place cell.
+    Connectivity is a Gaussian function of geodesic distance on the graph.
+    """
+    def __init__(self, Graph, params: PCParams = PCParams()):
+        super().__init__()
+        self.Graph = Graph
+        self.params = params
+        
+        # number of cells = number of nodes in graph
+        self.cell_num = len(Graph.nodes)
+        self.node_list = list(Graph.nodes)
+        
+        dx = self.Graph.graph["dx"] 
+        self.x = bm.asarray(np.arange(self.cell_num) * dx)
+        
+        # --- derived parameters ---
+        self.m = params.adaptation_strength * params.tau / params.tau_v
+
+        # --- compute geodesic distance matrix (cell_num×cell_num)
+        geodist = dict(nx.all_pairs_dijkstra_path_length(Graph, weight='weight'))
+        D = np.zeros((self.cell_num, self.cell_num))    
+        for i, ni in enumerate(self.node_list):
+            for j, nj in enumerate(self.node_list):
+                D[i, j] = geodist[ni][nj]
+        self.D = bm.asarray(D)        
+        
+        # --- build connectivity based on geodesic distance ---
+        base_connection = self.make_connection(self.D)
+        noise_connection = np.random.normal(0, params.conn_noise, size=(self.cell_num, self.cell_num))
+        self.conn_mat = base_connection + noise_connection
+
+        # --- state variables ---
+        self.r = bm.Variable(bm.zeros(self.cell_num))
+        self.u = bm.Variable(bm.zeros(self.cell_num))
+        self.v = bm.Variable(bm.zeros(self.cell_num))
+        self.center = bm.Variable(bm.zeros(1))
+
+        # --- integrator ---
+        self.integral = bp.odeint(method="exp_euler", f=self.derivative)
+
+    @property
+    def derivative(self):
+        du = lambda u, t, input: (-u + input - self.v) / self.params.tau
+        dv = lambda v, t: (-v + self.m * self.u) / self.params.tau_v
+        return bp.JointEq([du, dv])
+
+    # ===== connectivity based on geodesic distances =====
+    def make_connection(self, D):
+        """
+        Gaussian weight kernel based on graph geodesic distances.
+        """
+        a = self.params.a
+        J0 = self.params.J0
+        W = J0 * bm.exp(-0.5 * (D / a) ** 2)
+        # normalise or scale if desired
+        W = W / (bm.sqrt(2 * bm.pi) * a)
+        return W
+
+    def get_bump_center(self, r, x):
+        denom = bm.sum(r) + 1e-12
+        center = bm.sum(r * x) / denom
+        return center.reshape(-1,)
+        
+    # ===== external input based on animal position =====
+    def input_bump(self, animal_pos_node_index):
+        """
+        Generate Gaussian bump centred on the node corresponding to the animal's current position.
+        node_index: integer index into self.nodes
+        """
+        d = self.D[animal_pos_node_index]
+        return self.params.A * bm.exp(-0.5 * (d / self.params.a) ** 2)        
+
+    # ===== update loop =====
+    def update(self, animal_pos_node_index, ThetaInput):
+        self.center.value = self.get_bump_center(r=self.r, x=self.x)
+        Iext = ThetaInput * self.input_bump(animal_pos_node_index)
+        Irec = bm.matmul(self.conn_mat, self.r)
+        noise = bm.random.randn(self.cell_num) * self.params.noise_strength
+        input_total = Iext + Irec + noise
+
+        # integrate for current step
+        u, v = self.integral(self.u, self.v, bp.share.load("t"), input_total)
+        self.u.value = bm.where(u > 0, u, 0)
+        self.v.value = v
+
+        u_sq = bm.square(self.u)
+        self.r.value = self.params.g * u_sq / (1.0 + self.params.k * bm.sum(u_sq))
 
 
 @dataclass
@@ -50,7 +155,6 @@ class DCNet(bp.DynamicalSystem):
         self.u = bm.Variable(bm.zeros(self.cell_num))
         self.v = bm.Variable(bm.zeros(self.cell_num))
         self.center = bm.Variable(bm.zeros(1))
-        self.centerI = bm.Variable(bm.zeros(1))
 
         # --- integrator ---
         self.integral = bp.odeint(method="exp_euler", f=self.derivative)
@@ -95,13 +199,6 @@ class DCNet(bp.DynamicalSystem):
         return self.params.A * bm.exp(
             -0.5 * bm.square(self.calculate_dist(self.x - head_direction) / self.params.a)
         )
-
-    # ===== state management =====
-    def reset_state(self):
-        self.r[:] = 0.0
-        self.u[:] = 0.0
-        self.v[:] = 0.0
-        self.center[:] = 0.0
 
     # ===== update loop =====
     def update(self, head_direction, ThetaInput):

@@ -49,6 +49,39 @@ def plot_population_activity(ax, time_steps, theta_phase, net_activity, directio
     sns.despine(ax=ax)
     return ax
 
+def plot_population_activity_linear(ax, time_steps, theta_phase, net_activity, pos_index, add_lines=True, atol=1e-2, **kwargs):
+    """Plot HD network population activity + direction trace."""
+    cmap = kwargs.pop("cmap", "jet")  # 取出 cmap，如果没传就用 jet
+    
+    # net_norm = (net_activity - net_activity.min()) / (net_activity.max() - net_activity.min())
+
+    p1, p99 = np.percentile(net_activity, [1, 99])
+    net_norm = np.clip((net_activity - p1) / (p99 - p1), 0, 1) 
+      
+    N = net_activity.shape[1]
+    im = ax.imshow(
+        net_norm.T,
+        aspect="auto",
+        extent=[time_steps[0], time_steps[-1], 0, N],
+        origin="lower",
+        cmap=cmap,
+        vmin=0,
+        vmax=1,
+        **kwargs
+    )
+        
+    # linear (e.g. position)
+    ax.plot(time_steps, pos_index, color="white", lw=3)
+    ax.set_ylabel("Position (cm)")       
+    
+    if add_lines:
+        zero_phase_index = np.where(np.isclose(theta_phase, 0, atol=atol))[0]
+        for i in zero_phase_index:
+            ax.axvline(x=time_steps[i], color="grey", linestyle="--", linewidth=1, alpha=0.5)    
+
+    sns.despine(ax=ax)
+    return ax
+
 def plot_angular_velocity(ax, time_steps, velocity):
     """Plot angular speed trace into a given axis."""
 
@@ -58,6 +91,22 @@ def plot_angular_velocity(ax, time_steps, velocity):
     ax.set_ylim([-vmax, vmax])
     
     ax.set_ylabel("Ang. Vel.\n(rad/s)")
+    ax.set_xlabel("Time (s)")
+    
+    sns.despine(ax=ax)
+    return ax
+
+def plot_linear_velocity(ax, time_steps, velocity):
+    """Plot linear speed trace into a given axis."""
+
+    ax.fill_between(time_steps, velocity, 0, color="lightgrey", linewidth=1, alpha=0.9)
+    
+    # vmax = 1.2 * np.max(np.abs(velocity))
+    #vmax is abs(velocity) 98% percentile
+    vmax = np.percentile(np.abs(velocity), 98) * 1.2
+    ax.set_ylim([-vmax, vmax])
+    
+    ax.set_ylabel("Lin. Vel.\n(m/s)")
     ax.set_xlabel("Time (s)")
     
     sns.despine(ax=ax)
