@@ -12,7 +12,7 @@ class PCParams:
     noise_strength: float = 0.0
     k: float = 0.2
     adaptation_strength: float = 15.0
-    a: float = 0.7
+    a: float = 0.2
     A: float = 5.0
     J0: float = 1.0
     g: float = 1.0
@@ -386,7 +386,7 @@ class GCNet(bp.DynamicalSystem):
         return (bm.matmul(conj_input.T, weight).reshape(-1) * theta_modulation)  #dim: (num_gc, num_dc) x (num_dc,) -> (num_gc,)
 
     # ========================= Bump center (phase/pos) =========================
-    def get_unique_activity_bump(self, network_activity, animal_posistion):
+    def get_unique_activity_bump(self, network_activity, animal_position):
         """
         Estimate a unique bump (activity peak) from the current network state,
         given the animal's actual position.
@@ -413,7 +413,7 @@ class GCNet(bp.DynamicalSystem):
         # --- map back to real space, snap to nearest candidate ---
         center_phase_residual = bm.matmul(self.coor_transform_inv, center_phase) / self.params.mapping_ratio
         candidate_pos_all = self.candidate_centers + center_phase_residual
-        distances = bm.linalg.norm(candidate_pos_all - animal_posistion, axis=1)
+        distances = bm.linalg.norm(candidate_pos_all - animal_position, axis=1)
         center_position = candidate_pos_all[bm.argmin(distances)]
 
         # --- build Gaussian bump template ---
