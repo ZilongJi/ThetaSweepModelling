@@ -5,6 +5,8 @@ import jax
 import numpy as np
 import networkx as nx
 
+from sweep import plotting
+
 @dataclass
 class PCParams:
     tau: float = 10.0
@@ -20,9 +22,35 @@ class PCParams:
 
 class PCNet(bp.DynamicalSystem):
     """
-    Graph-based continuous-attractor place cell network.
-    Each node in G corresponds to a place cell.
-    Connectivity is a Gaussian function of geodesic distance on the graph.
+    Graph-based continuous-attractor place cell network (linearized track version).
+
+    Each node in the graph corresponds to a place cell.
+    Synaptic connectivity is defined as a Gaussian function of the
+    geodesic distance between nodes. 
+    If it is a linear track, the geodesic distance is the same as the Euclidean distance.
+    If it is a T maze track or other more complex track, the geodesic distance is the shortest path distance along the track.
+    This distance measurement is important for the network behaviours
+
+    Parameters
+    ----------
+    Graph : networkx.Graph
+        Graph where nodes represent place cells and edge weights represent distances.
+        Must include 'dx' in Graph.graph.
+    params : PCParams
+        Parameter object containing model constants such as a, J0, tau, etc.
+
+    Attributes
+    ----------
+    cell_num : int
+        Number of place cells (nodes).
+    D : brainpy.math array
+        Matrix of geodesic distances between nodes.
+    conn_mat : brainpy.math array
+        Synaptic weight matrix.
+    r, u, v : bm.Variable
+        Neural rate, internal state, and adaptation state.
+    center : bm.Variable
+        Estimated bump centre position.
     """
     def __init__(self, Graph, params: PCParams = PCParams()):
         super().__init__()
@@ -33,7 +61,10 @@ class PCNet(bp.DynamicalSystem):
         self.cell_num = len(Graph.nodes)
         self.node_list = list(Graph.nodes)
         
-        dx = self.Graph.graph["dx"] 
+        dx = self.Graph.graph.get("dx", None)
+        if dx is None:
+            raise ValueError("Graph.graph['dx'] must be defined (spatial step size).")
+        
         self.x = bm.asarray(np.arange(self.cell_num) * dx)
         
         # --- derived parameters ---

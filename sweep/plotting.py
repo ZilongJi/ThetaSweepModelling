@@ -71,7 +71,15 @@ def plot_population_activity_linear(ax, time_steps, theta_phase, net_activity, p
     )
         
     # linear (e.g. position)
-    ax.plot(time_steps, pos_index, color="white", lw=3)
+    # ax.plot(time_steps, pos_index, color="white", lw=3)
+    # --- Handle jumps in position trace ---
+    pos_clean = pos_index.copy().astype(float)
+    jumps = np.where(np.abs(np.diff(pos_index)) > 10)[0]
+    pos_clean[jumps + 1] = np.nan   # break the trace at large jumps
+
+    # Plot continuous position trace
+    ax.plot(time_steps, pos_clean, color="white", lw=3)    
+    
     ax.set_ylabel("Position (cm)")       
     
     if add_lines:
@@ -96,17 +104,17 @@ def plot_angular_velocity(ax, time_steps, velocity):
     sns.despine(ax=ax)
     return ax
 
-def plot_linear_velocity(ax, time_steps, velocity):
+def plot_linear_speed(ax, time_steps, speed):
     """Plot linear speed trace into a given axis."""
 
-    ax.fill_between(time_steps, velocity, 0, color="lightgrey", linewidth=1, alpha=0.9)
+    ax.fill_between(time_steps, speed, 0, color="lightgrey", linewidth=1, alpha=0.9)
     
     # vmax = 1.2 * np.max(np.abs(velocity))
     #vmax is abs(velocity) 98% percentile
-    vmax = np.percentile(np.abs(velocity), 98) * 1.2
-    ax.set_ylim([-vmax, vmax])
+    vmax = np.percentile(np.abs(speed), 98) * 1.2
+    ax.set_ylim([0, vmax])
     
-    ax.set_ylabel("Lin. Vel.\n(m/s)")
+    ax.set_ylabel("Speed.\n(m/s)")
     ax.set_xlabel("Time (s)")
     
     sns.despine(ax=ax)
